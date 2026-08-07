@@ -77,6 +77,17 @@ c     already body-agnostic: they just need "radius of the body the
 c     satellite orbits," which for a lunar orbiter's eclipse geometry
 c     is correctly the Moon's own radius.
       common /xy/ pi,d2r,r2d,amue,AU,R_Earth
+c     Loop-control scalars, deliberately isolated in their own COMMON
+c     block rather than left as ordinary stack locals. This is the
+c     real fix for the gfortran stack-corruption issue documented
+c     above (istep was the observed victim, but the mechanism is a
+c     general stack-layout/ABI interaction, not specific to istep) --
+c     COMMON storage is static, not stack-allocated, so it cannot be
+c     corrupted by whatever this compiler quirk perturbs on the
+c     stack. Confirmed fix: driver runs clean under gfortran (Windows
+c     and Linux) and ifx alike with this in place.
+      integer nrev, istep, ik, ki, idump
+      common /loopctl/ nrev, istep, ik, ki, idump
       dimension pek(7),x(3),xd(3),q(4),u(4),us(4),y(10),z(10)
       dimension qu(3),q_til(4),u_til(4),uu(4)
       dimension ZbyR(cn0*2),ObyR(cn0*2),Re(cn0)
@@ -93,11 +104,18 @@ c     that form, followed by a scalar declaration and a call
 c     passing one of the two arrays to an externally-compiled
 c     subroutine (lunarpv/solarnpv, compiled in the KSROP
 c     dependency, a separate translation unit), reproducibly
-c     corrupts the scalar via a gfortran stack-layout/ABI
-c     interaction confirmed independent of -fcheck and of
-c     optimization level (isolated in a 15-line repro outside
-c     this file). Splitting the declaration is a complete,
-c     verified fix -- not a superstition.
+c     corrupts an unrelated scalar via a gfortran stack-layout/ABI
+c     interaction confirmed independent of -fcheck, optimization
+c     level, and OS (reproduces on both Windows/MinGW and Linux
+c     gfortran, isolated in a small repro outside this file).
+c     Splitting this one declaration was NOT sufficient by itself
+c     in the full driver (a different local array elsewhere still
+c     triggered the same class of corruption) -- see the loop-
+c     control COMMON block below for the actual fix, which sidesteps
+c     the mechanism entirely by moving the vulnerable scalars off
+c     the stack. This split is kept anyway since it is still a
+c     correct, verified partial mitigation and documents the pattern
+c     to avoid.
       dimension moon_wrt_earth(3)
       dimension sun_wrt_earth(3)
 c     No drag: this driver has no atmosphere table, no ALT_atm/

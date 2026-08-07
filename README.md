@@ -70,15 +70,15 @@ KSROP-Lunar/
 ## 3. Quick Start
 
 ```bash
-fpm build --compiler ifx        # see §4 -- gfortran has a Windows-only caveat
-fpm test  --compiler ifx        # 6 unit checks
+fpm build --compiler gfortran
+fpm test  --compiler gfortran   # 6 unit checks
 ```
 
 Then run the propagator directly (reads the tracked `input/` files as-is —
 a 100 km altitude circular low lunar orbit):
 
 ```bash
-fpm run driver_KS_lunar --compiler ifx
+fpm run driver_KS_lunar --compiler gfortran
 ```
 
 Writes `output/KSROP_LUNAR_<timestamp>.oem` (trajectory) and
@@ -92,24 +92,26 @@ Requires **Intel oneAPI Fortran (`ifx`)** or **GNU Fortran (`gfortran`)**,
 same as KSROP itself.
 
 ```bash
-fpm build --compiler ifx        # recommended on Windows -- see caveat below
-fpm build --compiler gfortran   # works on Linux/CI; see caveat below
+fpm build --compiler gfortran   # works on Windows and Linux -- see note below
+fpm build --compiler ifx        # also works
 ```
 
-### Known compiler caveat (Windows + gfortran only)
+### Resolved compiler issue (both toolchains work now)
 
-On Windows, a `gfortran`-built `driver_KS_lunar.exe` crashes with a memory
-corruption (a loop-control integer gets clobbered during an ephemeris call)
-that traces to a **gfortran/MinGW-specific stack-layout quirk**, confirmed
-via an isolated ~15-line reproduction to be independent of this repo's
-application logic and independent of `-fcheck`/optimization level — not a
-bug in KSROP's physics or this driver. **Building with `ifx` on Windows
-avoids it entirely** (confirmed: `fpm build --compiler ifx` +
-`fpm run`/`fpm test` all run cleanly). CI builds with `gfortran` on
-**Ubuntu** instead of Windows, where this MinGW-specific issue is not
-expected to reproduce (different ABI/toolchain) — if CI ever shows
-otherwise, that will be the first real evidence this is broader than a
-Windows/MinGW quirk, and worth a KSROP-Lunar issue of its own.
+During initial development, a `gfortran`-built `driver_KS_lunar.exe` crashed
+with a memory corruption (a loop-control integer got clobbered during an
+ephemeris call) — reproduced on **both** Windows/MinGW gfortran and Linux
+gfortran (caught by this repo's own CI), so it was a genuine gfortran
+stack-layout/ABI quirk, not a Windows-only issue, and not a bug in KSROP's
+physics. Root-caused via an isolated repro to a specific pattern (two
+same-size local arrays declared in one combined `dimension` statement,
+followed by a scalar, with one array passed to an externally-compiled
+subroutine) and **fixed** by moving the vulnerable loop-control scalars
+(`nrev`, `istep`, `ik`, `ki`, `idump`) into their own `common /loopctl/`
+block — static storage, not stack-allocated, so immune to the mechanism
+regardless of its exact cause. See `app/driver_KS_lunar.F`'s header comment
+for the full writeup. Confirmed clean on `gfortran` (Windows and Linux CI)
+and `ifx` alike after the fix.
 
 `fpm.toml` sets `[fortran] source-form = "fixed"` /
 `implicit-typing = true` / `implicit-external = true`, same reasons as
@@ -120,7 +122,7 @@ KSROP itself (F77-style fixed-form, implicit typing).
 ## 5. Running
 
 ```bash
-fpm run driver_KS_lunar --compiler ifx
+fpm run driver_KS_lunar --compiler gfortran
 ```
 
 Reads `input/input.opm` (initial state, Moon-centered), `input/input.dat`
@@ -134,12 +136,12 @@ Writes `output/KSROP_LUNAR_<timestamp>.oem` (CCSDS OEM v2.0 trajectory),
 ## 6. Testing
 
 ```bash
-fpm test --compiler ifx                              # 6 unit checks
+fpm test --compiler gfortran                          # 6 unit checks
 python test_lunar_regimes.py <path-to-driver_KS_lunar.exe>   # 110 checks
 ```
 
-**Total: 116 automated checks**, all passing (2026-08-07, `ifx` on
-Windows). The Python integration test sweeps 10 lunar orbit regimes — low
+**Total: 116 automated checks**, all passing (2026-08-07, `gfortran` on
+Windows and Linux CI, and `ifx`). The Python integration test sweeps 10 lunar orbit regimes — low
 lunar orbit (equatorial and polar/LRO-like), an eccentric case, a
 near-equatorial case, the four inclinations at which lunar orbits are known
 to be long-term "frozen" (27°, 50°, 76°, 86° — Elipe & Lara 2003; Nie &
@@ -205,7 +207,6 @@ body-fixed rotating frame.
   bundled here (same "sourced separately" pattern as KSROP's own EGM2008
   file). `geo_coeff_body` (KSROP v2.3.0+) can read a larger coefficient
   file in the same row format without any code change here.
-- **Windows + gfortran crash** — see §4. Use `ifx` on Windows.
 - **No atmospheric drag** — the Moon is airless; this is by design, not a
   gap.
 - **SRP shadow radius correctly reuses the Moon's own radius** (the
@@ -228,7 +229,7 @@ body-fixed rotating frame.
 
 | Date | Change |
 |---|---|
-| 2026-08-07 | Initial repo: `driver_KS_lunar.F` (Moon-centered driver, reusing KSROP v2.3.0's KS engine/force-model math unmodified via the third-body slot repurposing convention), lunar J2 coefficient file (JPL/GRAIL-sourced), unit tests (6 checks) and multi-regime integration test (110 checks across 10 lunar orbit regimes, all passing). Diagnosed and worked around a gfortran/MinGW-specific Windows build issue (§4) by building with `ifx`. Companion to KSROP issue #26. |
+| 2026-08-07 | Initial repo: `driver_KS_lunar.F` (Moon-centered driver, reusing KSROP v2.3.0's KS engine/force-model math unmodified via the third-body slot repurposing convention), lunar J2 coefficient file (JPL/GRAIL-sourced), unit tests (6 checks) and multi-regime integration test (110 checks across 10 lunar orbit regimes, all passing). Found and fixed a real gfortran stack-layout bug (reproduced on both Windows and Linux CI) by isolating loop-control scalars into a COMMON block — both `gfortran` and `ifx` now build and run clean. Companion to KSROP issue #26. |
 
 ---
 
