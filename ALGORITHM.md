@@ -91,7 +91,8 @@ propagation run is inherently sequential).
 ## 8. Validation & Accuracy
 116 automated checks (6 Fortran unit tests + 110 Python integration
 checks across 10 lunar orbit regimes, two-body and full-dynamics phases),
-all passing as of 2026-08-07 (`ifx` build, Windows). Internal-consistency
+all passing as of 2026-08-07 (`gfortran` on Windows and Linux CI, and
+`ifx`). Internal-consistency
 validation only (conservation laws, bounded drift) — **no independent
 cross-validation** (e.g. against GMAT with a real lunar force model) has
 been done yet, unlike KSROP's own Earth-centered campaign (~1.9 km over 2
@@ -103,10 +104,6 @@ open follow-on work, not yet an issue.
 - **J2-only lunar gravity field** — see README §8; the Moon's real field
   is mascon-dominated (strong C22 and higher-degree/order terms), so this
   is a deliberately coarse first cut, not production-fidelity.
-- **Windows + gfortran build issue** — see README §4; use `ifx` on
-  Windows. Root-caused to a gfortran/MinGW-specific stack-layout quirk
-  independent of this repo's logic, not chased further given `ifx` fully
-  resolves it and matches KSROP's own primary/most-tested toolchain.
 - **No independent (GMAT) cross-validation** — see §8.
 - **`EME2000`-labeled but Moon-centered frame** — axes parallel to
   Earth-equatorial J2000, translated (not rotated) to the Moon's center;
