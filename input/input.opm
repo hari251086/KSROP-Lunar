@@ -1,0 +1,19 @@
+CCSDS_OPM_VERS = 2.0
+CREATION_DATE  = 2026-08-07T00:00:00.000
+ORIGINATOR     = KSROP-Lunar
+
+META_START
+OBJECT_NAME    = LUNAR_ORBITER
+CENTER_NAME    = MOON
+REF_FRAME      = EME2000
+TIME_SYSTEM    = UTC
+META_STOP
+
+STATE_VECTOR
+EPOCH          = 2026-08-07T00:00:00.000
+X              =         1837.400000000 [km]
+Y              =            0.000000000 [km]
+Z              =            0.000000000 [km]
+X_DOT          =            0.000000000 [km/s]
+Y_DOT          =            1.633480000 [km/s]
+Z_DOT          =            0.000000000 [km/s]

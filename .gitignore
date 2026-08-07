@@ -1,0 +1,53 @@
+# -------------------------------------------------------
+# KSROP-Lunar — .gitignore
+# -------------------------------------------------------
+
+# Fortran compiled objects and modules
+*.o
+*.obj
+*.mod
+*.smod
+
+# Static and dynamic libraries
+*.a
+*.lib
+*.dll
+
+# Executables and build artefacts
+*.exe
+*.app
+
+# Intel Fortran specific
+*.ilk
+*.pdb
+*.optrpt
+*.i90
+
+# fpm build directory
+build/
+
+# ------- Runtime output files (written to output/) -------
+output/*
+!output/.gitkeep
+
+# ------- Test infrastructure -------
+*.bak_ic
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ------- Editor and OS noise -------
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Credentials -- never commit these
+.env
+.env.*
+*.netrc
+*_credentials.*
+secrets.*

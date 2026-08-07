@@ -1,0 +1,26 @@
+name = "ksrop-lunar"
+version = "0.1.0"
+license = "license"
+author = "Harishkumar Sellamuthu"
+description = "Moon-centered KS-regularized orbit propagator, built on KSROP"
+
+[library]
+source-dir = "src"
+
+[fortran]
+source-form = "fixed"
+implicit-typing = true
+implicit-external = true
+
+[[executable]]
+name = "driver_KS_lunar"
+source-dir = "app"
+main = "driver_KS_lunar.F"
+
+[[test]]
+name = "test_lunar_regimes"
+source-dir = "test"
+main = "test_lunar_regimes.F"
+
+[dependencies]
+ksrop = { git = "https://github.com/hari251086/KSROP", tag = "v2.3.0" }

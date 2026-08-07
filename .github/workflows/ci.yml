@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, HS-dev]
+
+jobs:
+  fpm-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gfortran
+        run: sudo apt-get update && sudo apt-get install -y gfortran
+
+      - name: Normalize line endings (CRLF -> LF)
+        run: sed -i 's/\r$//' app/*.F test/*.F
+
+      - name: Install fpm
+        run: |
+          curl -L -o fpm https://github.com/fortran-lang/fpm/releases/download/v0.13.0/fpm-0.13.0-linux-x86_64-gcc-12
+          chmod +x fpm
+          sudo mv fpm /usr/local/bin/fpm
+
+      - name: fpm build (resolves KSROP v2.3.0 as a git dependency)
+        run: fpm build --compiler gfortran
+
+      - name: fpm test (6 unit checks)
+        run: fpm test --compiler gfortran
+
+      - name: Multi-regime integration test (110 checks, 10 lunar orbit regimes)
+        run: |
+          EXE=$(find build -name driver_KS_lunar -type f | head -1)
+          python3 test_lunar_regimes.py "$EXE"
