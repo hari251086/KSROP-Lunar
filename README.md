@@ -30,7 +30,7 @@ relative to the Moon are both obtainable by vector arithmetic on KSROP's
 series needed. See `app/driver_KS_lunar.F`'s header comment (THIRD-BODY SLOT
 REPURPOSING) for the exact construction.
 
-This repo depends on `KSROP` (git tag `v2.3.0`) and is independent of every
+This repo depends on `KSROP` (git tag `v2.8.0`) and is independent of every
 other repo under `GitHub\` otherwise. It does **not** cover getting a
 spacecraft *to* the Moon — a genuine translunar transfer passes through a
 regime where Earth and Moon gravity are locally comparable, which breaks
@@ -44,8 +44,9 @@ explicitly blocked on this repo landing first.
 
 ```
 KSROP-Lunar/
-├── fpm.toml                        fpm manifest; depends on KSROP v2.3.0
-├── src/                            (empty — no library code of its own)
+├── fpm.toml                        fpm manifest; depends on KSROP v2.8.0
+├── src/
+│   └── moon_rotation.F             Moon prime-meridian rotation angle (issue #30)
 ├── app/
 │   └── driver_KS_lunar.F           Moon-centered propagator (see header
 │                                    comment for the third-body slot
@@ -197,21 +198,23 @@ body-fixed rotating frame.
 
 ## 8. Known Issues / Limitations
 
-- **Gravity field is zonal-only (J2), and that's a real ceiling, not just a
-  missing data file.** `input/GRAIL_lowdeg_zonal.dat` ships a single
-  degree-2 zonal row (normalized C̄₂₀ = −9.065019580784147×10⁻⁵, derived
-  from J2 = 202.7×10⁻⁶). The Moon's real gravity field is strongly
-  **mascon-dominated** (large localized C22 and higher-degree/order
-  terms, not just zonals) — and unlike a simple "supply a bigger
-  coefficient file" gap, `geo_coeff_body` (KSROP v2.3.0+) cannot actually
-  consume those terms even if a full GRGM-lineage file (e.g. GRGM900C)
-  were supplied: it explicitly filters non-zonal rows, and KSROP's whole
-  force-model pipeline has no tesseral (order m>0) force law at all.
-  Tracked upstream as
-  [KSROP#29](https://github.com/hari251086/KSROP/issues/29) — deliberately
-  scoped as a KSROP-level force-model extension (concrete motivating case:
-  a real, published Mars C₂₂/S₂₂ coefficient KSROP-Mars also can't
-  consume), not a fix local to this repo.
+- ~~Gravity field is zonal-only (J2), and that's a real ceiling, not just
+  a missing data file~~ — **fixed 2026-08-08**: `input/GRAIL_tess22.dat`
+  ships the real degree-2 order-2 term, C̄₂₂ = 3.4673798×10⁻⁵, S̄₂₂ ≈
+  −2.5×10⁻¹⁰ (consistent with zero, as expected for the Moon's
+  tidally-locked long axis) — GRAIL Primary Mission solution (Konopliv
+  et al. 2013, *JGR: Planets* 118, Table 4), wired via KSROP's general
+  `(n,m)` tesseral support ([KSROP#30](https://github.com/hari251086/KSROP/issues/30)).
+  A new `moon_rotation_angle_deg` (`src/moon_rotation.F`) supplies the
+  lunar prime-meridian angle this needs — see ALGORITHM.md and Version
+  History for the source, and an important caveat: this uses only the
+  *secular* part of the IAU rotation model, omitting the Moon's real
+  (multi-degree-amplitude) physical libration, a larger relative gap
+  than the analogous Earth/Mars simplifications. The Moon's real field
+  remains **mascon-dominated** beyond (2,2) — a fuller GRGM-lineage
+  table (e.g. GRGM900C) would need no further code change
+  (`geo_coeff_tess_general` already supports arbitrary `(n,m)`), just
+  more coefficient rows.
 - **No atmospheric drag** — the Moon is airless; this is by design, not a
   gap.
 - **SRP shadow radius correctly reuses the Moon's own radius** (the
@@ -235,12 +238,13 @@ body-fixed rotating frame.
 | Date | Change |
 |---|---|
 | 2026-08-07 | Initial repo: `driver_KS_lunar.F` (Moon-centered driver, reusing KSROP v2.3.0's KS engine/force-model math unmodified via the third-body slot repurposing convention), lunar J2 coefficient file (JPL/GRAIL-sourced), unit tests (6 checks) and multi-regime integration test (110 checks across 10 lunar orbit regimes, all passing). Found and fixed a real gfortran stack-layout bug (reproduced on both Windows and Linux CI) by isolating loop-control scalars into a COMMON block — both `gfortran` and `ifx` now build and run clean. Companion to KSROP issue #26. |
+| 2026-08-08 | **Tesseral (2,2) rollout from KSROP#30**: bumped the KSROP dependency to v2.8.0 (general `(n,m)` tesseral/mascon support). Added `moon_rotation_angle_deg` (`src/moon_rotation.F`) — the Moon's prime-meridian rotation angle, `W = 38.3213 + 13.17635815·d` (`d`=days from J2000), sourced directly from NASA NAIF's public `pck00011.tpc` SPICE kernel (IAU 2009 rotation model); the rate matches the Moon's known synchronous rotation (360°/27.321661-day sidereal month = 13.17640°/day) to 5 significant figures. **Deliberately secular-only**: the full IAU model has 13 periodic physical-libration correction terms (also in the same kernel, `BODY301_NUT_PREC_PM`) that are *not* implemented — a materially larger relative gap than the analogous Earth/Mars simplifications, since real lunar libration amplitude is degrees, not arcseconds. Added `input/GRAIL_tess22.dat` with the real GRAIL Primary Mission (2,2) coefficients (Konopliv et al. 2013, Table 4), and wired `geo_coeff_tess_general`/`rotate_tess_coeffs`/`tess_general_force` into `driver_KS_lunar.F`'s propagation loop, mirroring KSROP's own driver wiring pattern exactly. Verified genuinely active via a before/after comparison at 100 km altitude (a=1837.4 km) over 10 revolutions: real vs. zeroed (2,2) coefficients diverge by ~12 m — consistent in scale with KSROP's own Earth LEO validation for this same non-resonant regime. 116/116 existing checks still pass unchanged. |
 
 ---
 
 ## 10. Dependencies / References
 
-- **KSROP** (git tag `v2.3.0`): the KS-regularized propagation engine,
+- **KSROP** (git tag `v2.8.0`): the KS-regularized propagation engine,
   force-model math, and CCSDS I/O are all consumed as an fpm library
   dependency, unmodified — see `fpm.toml`.
 - **Lunar physical constants**: JPL Horizons / GRAIL mission

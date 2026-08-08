@@ -133,6 +133,18 @@ c     Trajectory buffer: allocated once nrev is known; written after run
       double precision, allocatable :: traj_jd(:)
       double precision, allocatable :: traj_x(:,:)
       double precision, allocatable :: traj_xd(:,:)
+c     General (n,m) tesseral/mascon harmonics (KSROP#30 rollout,
+c     KSROP-Lunar issue #26): q_gen is the KS-element force
+c     contribution, amue-free like q(j) itself; tau_gen likewise
+c     amue-free. Real GRAIL (Konopliv et al. 2013) (2,2) data loaded
+c     -- see input/GRAIL_tess22.dat. ntess_cap bounds the degree
+c     independently of ngeo_deg for the same reason as KSROP's own
+c     driver_KS.F (Cunningham recursion is O(n^2)/step, not O(n)).
+      integer ntess_cap, ntess_use
+      parameter (ntess_cap = 10)
+      dimension q_gen(4)
+      double precision, allocatable :: Cnm_tess(:,:), Snm_tess(:,:)
+      double precision, allocatable :: Cnm_rot(:,:), Snm_rot(:,:)
 
       pi=4.d0*datan(1.d0)
       d2r=pi/180.d0
@@ -190,15 +202,29 @@ c     SRP on/off, shadow model (0=sunlit,1=cyl,2=cone)
       write(*,*) '=============================================='
       write(*,*) 'KSROP-Lunar: Moon-centered propagation'
 
+      ntess_use = min(ngeo_deg, ntess_cap)
+      allocate(Cnm_tess(0:ntess_use,0:ntess_use),
+     &         Snm_tess(0:ntess_use,0:ntess_use),
+     &         Cnm_rot(0:ntess_use,0:ntess_use),
+     &         Snm_rot(0:ntess_use,0:ntess_use))
+
       if(ngeo_deg.eq.0.or.ngeo_deg.eq.1) then
          do i = 1,cn0
             c_j(i) = 0.d0
+         end do
+         do i = 0,ntess_use
+            do j = 0,ntess_use
+               Cnm_tess(i,j) = 0.d0
+               Snm_tess(i,j) = 0.d0
+            end do
          end do
       else
 !     compute j_n values from the lunar gravity coefficient file
 !     (geo_coeff_body: KSROP v2.3.0+, see KSROP issue #26)
          call geo_coeff_body(ngeo_deg,c_j,
      &        'input/GRAIL_lowdeg_zonal.dat')
+         call geo_coeff_tess_general('input/GRAIL_tess22.dat',
+     &        ntess_use, Cnm_tess, Snm_tess)
       end if
 
 !     Initialization
@@ -219,6 +245,15 @@ c     REPURPOSING above): ts=Earth, tm=Sun.
          ts(i) = -moon_wrt_earth(i)
          tm(i) = sun_wrt_earth(i) - moon_wrt_earth(i)
       end do
+
+c     General (n,m) tesseral (KSROP#30 rollout): the Moon's rotation
+c     angle at this epoch, and the resulting time-dependent rotated
+c     coefficient table tess_general_force needs -- see
+c     moon_rotation_angle_deg/rotate_tess_coeffs/tess_general_force
+c     header comments.
+      call moon_rotation_angle_deg(djulian, theta_tess)
+      call rotate_tess_coeffs(ntess_use, Cnm_tess, Snm_tess,
+     &                        theta_tess, Cnm_rot, Snm_rot)
 
       R(1) = vmn(x)
       V = vmn(xd)
@@ -359,6 +394,14 @@ c     eq. 2.56), reused unmodified from KSROP's Earth driver.
      &                   *ObyR(i)
             end do
 
+c     General (n,m) tesseral contribution (KSROP#30 rollout):
+c     q_gen/tau_gen are amue-free, like q(j)/Tau_geo's own zonal
+c     accumulation, so amue is applied here exactly as it already
+c     is for Tau_geo above.
+            call tess_general_force(u, R_Earth, ntess_use, Cnm_rot,
+     &                               Snm_rot, q_gen, tau_gen)
+            Tau_geo = Tau_geo + amue*tau_gen
+
             Tau_3body1 = 0.d0
             do i = 2,nsun_deg
                Tau_3body1=Tau_3body1
@@ -409,6 +452,12 @@ c     -----------------------------------------------------------
      &                 -uu(j)*(i+1)*R(1)*x(3))))/z2mR2)
                   q(j)=qj+q(j)
                end do
+
+c     General (n,m) tesseral contribution, computed once (all 4
+c     components together) above -- amue-free like the zonal q(j)
+c     sum, so it is picked up automatically by the same
+c     "q(j)*amue" downstream.
+               q(j) = q(j) + q_gen(j)
 
 !     third-body terms: Earth (slot "s") + Sun (slot "m")
                call u2qu(u,qu,j)
@@ -485,6 +534,13 @@ c     -----------------------------------------------------------
                ts(i) = -moon_wrt_earth(i)
                tm(i) = sun_wrt_earth(i) - moon_wrt_earth(i)
             end do
+
+c     General (n,m) tesseral (KSROP#30 rollout): refresh at the
+c     same cadence as the Earth/Sun ephemeris above, since the
+c     Moon's rotation angle changes with time, not position.
+            call moon_rotation_angle_deg(djulian1, theta_tess)
+            call rotate_tess_coeffs(ntess_use, Cnm_tess, Snm_tess,
+     &                              theta_tess, Cnm_rot, Snm_rot)
 
             call third_body_aux(nsun_deg,  x, ts, R(1), amuS,
      &                          Rs(1), RbyRs, first_s, cphi_s, cphi_s2)

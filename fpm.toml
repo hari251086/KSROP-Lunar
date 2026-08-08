@@ -1,5 +1,5 @@
 name = "ksrop-lunar"
-version = "0.1.0"
+version = "0.2.0"
 license = "license"
 author = "Harishkumar Sellamuthu"
 description = "Moon-centered KS-regularized orbit propagator, built on KSROP"
@@ -23,4 +23,4 @@ source-dir = "test"
 main = "test_lunar_regimes.F"
 
 [dependencies]
-ksrop = { git = "https://github.com/hari251086/KSROP", tag = "v2.3.0" }
+ksrop = { git = "https://github.com/hari251086/KSROP", tag = "v2.8.0" }
