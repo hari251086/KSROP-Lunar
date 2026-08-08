@@ -24,7 +24,7 @@ jobs:
           chmod +x fpm
           sudo mv fpm /usr/local/bin/fpm
 
-      - name: fpm build (resolves KSROP v2.3.0 as a git dependency)
+      - name: fpm build (resolves KSROP v2.8.0 as a git dependency)
         run: fpm build --compiler gfortran
 
       - name: fpm test (6 unit checks)

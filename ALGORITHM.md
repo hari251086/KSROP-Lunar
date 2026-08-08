@@ -3,14 +3,15 @@
 ## 1. Overview
 KSROP-Lunar is a Moon-centered orbit propagator built on top of `KSROP`
 (the Earth-orbiting KS-regularized propagator, consumed here as an fpm
-library dependency, git tag `v2.3.0`). It exists to answer KSROP issue #26
+library dependency, git tag `v2.8.0`). It exists to answer KSROP issue #26
 (does KSROP's central-body-plus-third-body architecture generalize beyond
 Earth?) and is a sibling to `KSROP-Mars`. It has no other dependency
 relationship within `GitHub\`.
 
 ## 2. Problem Statement
 Numerically integrate a spacecraft's trajectory forward in time around the
-Moon, under lunar oblateness (zonal, currently J2-only — see §9), Earth and
+Moon, under lunar oblateness (zonal J2 plus the real (2,2) tesseral term
+— see §5/§9), Earth and
 Sun third-body gravity, and solar radiation pressure, given an initial
 Moon-centered Cartesian state and epoch. "Correct" means the same thing it
 means in KSROP itself: energy/angular-momentum/orbit-closure conservation
@@ -31,11 +32,17 @@ line** (3 lines: `nrev/istep/tole`, force flags, SRP params — see
 ## 4. Core Algorithm
 1. **Initialization**: identical to KSROP's own driver — read
    `const_moon.dat`/`input.dat`/`input.opm`, `car2oe`/`oe2car` round-trip,
-   `force_models` resolves on/off flags. The lunar gravity coefficient is
-   loaded via `geo_coeff_body(ngeo_deg, c_j, 'input/GRAIL_lowdeg_zonal.dat')`
-   — KSROP v2.3.0's file-parameterized entry point (added specifically to
-   support this repo, see KSROP's own `README.md` revision history), rather
-   than the Earth-hardcoded `geo_coeff` wrapper.
+   `force_models` resolves on/off flags. The lunar zonal gravity
+   coefficient is loaded via `geo_coeff_body(ngeo_deg, c_j,
+   'input/GRAIL_lowdeg_zonal.dat')` — KSROP v2.3.0's file-parameterized
+   entry point (added specifically to support this repo, see KSROP's own
+   `README.md` revision history), rather than the Earth-hardcoded
+   `geo_coeff` wrapper. The real (2,2) tesseral term is loaded via
+   `geo_coeff_tess_general(ntess_use, ..., 'input/GRAIL_tess22.dat')`
+   (KSROP#30 rollout, 2026-08-08). `moon_rotation_angle_deg`
+   (`src/moon_rotation.F`) supplies the lunar prime-meridian angle
+   `rotate_tess_coeffs` needs — the Moon analogue of KSROP's own
+   Earth-specific `gmst_deg` and KSROP-Mars's `mars_rotation_angle_deg`.
 2. **Third-body ephemerides — the one genuinely new piece of logic**:
    KSROP's `solarnpv(dj,s)`/`lunarpv(dj,tm)` return the Sun's and Moon's
    position **as seen from Earth** (geocentric, EME2000). For a
@@ -101,11 +108,16 @@ project memory). A GMAT (or other independent tool) lunar cross-check is
 open follow-on work, not yet an issue.
 
 ## 9. Known Limitations
-- **J2-only lunar gravity field, and it's a real ceiling** — see README
-  §8; the Moon's real field is mascon-dominated (strong C22 and
-  higher-degree/order terms) and KSROP's zonal-only force-model pipeline
-  cannot consume those terms regardless of what coefficient file is
-  supplied (KSROP#29).
+- ~~J2-only lunar gravity field, and it's a real ceiling~~ — **fixed
+  2026-08-08**: the real GRAIL-measured (2,2) term is now wired in via
+  KSROP#30's general `(n,m)` support; see README §8 and §9 Version
+  History. Only (2,2) is loaded — the Moon's real field remains
+  mascon-dominated beyond that; a fuller GRGM-lineage table would need
+  no further code change, just more coefficient rows.
+- **`moon_rotation_angle_deg` is secular-only** — omits the Moon's real
+  physical libration (degree-amplitude periodic terms), a materially
+  larger relative gap than the analogous Earth/Mars rotation-angle
+  simplifications; see README §8.
 - **No independent (GMAT) cross-validation** — see §8.
 - **`EME2000`-labeled but Moon-centered frame** — axes parallel to
   Earth-equatorial J2000, translated (not rotated) to the Moon's center;
@@ -115,10 +127,12 @@ open follow-on work, not yet an issue.
   not provide.
 
 ## 10. Dependencies
-- **KSROP** (git tag `v2.3.0`): consumed as an fpm library dependency —
-  the entire KS engine, integrator, force-model math, and CCSDS I/O are
-  KSROP's own, unmodified. `geo_coeff_body` (KSROP v2.3.0+) was added
-  upstream specifically to support this repo's lunar coefficient file.
+- **KSROP** (git tag `v2.8.0`): consumed as an fpm library dependency —
+  the entire KS engine, integrator, force-model math, CCSDS I/O, and
+  (since 2026-08-08) the general `(n,m)` tesseral/mascon harmonic
+  support (`Cunningham.F`) are KSROP's own, unmodified. `geo_coeff_body`
+  (KSROP v2.3.0+) was added upstream specifically to support this
+  repo's lunar coefficient file.
 - **No other `GitHub\` repo dependency.**
 - **External data**: none required beyond the two small files this repo
   ships (`GRAIL_lowdeg_zonal.dat`, tiny; no large external download needed,
