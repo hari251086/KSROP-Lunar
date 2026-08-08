@@ -197,16 +197,21 @@ body-fixed rotating frame.
 
 ## 8. Known Issues / Limitations
 
-- **Gravity field is J2-only.** `input/GRAIL_lowdeg_zonal.dat` ships a
-  single degree-2 zonal row (normalized C̄₂₀ = −9.065019580784147×10⁻⁵,
-  derived from J2 = 202.7×10⁻⁶). This is a deliberately minimal "first
-  order oblateness" approximation — the Moon's real gravity field is
-  strongly **mascon-dominated** (large localized C22 and higher-degree/order
-  terms, not just zonals), so a real high-fidelity lunar orbiter would need
-  an actual GRGM-lineage coefficient file (e.g. GRGM900C), which is not
-  bundled here (same "sourced separately" pattern as KSROP's own EGM2008
-  file). `geo_coeff_body` (KSROP v2.3.0+) can read a larger coefficient
-  file in the same row format without any code change here.
+- **Gravity field is zonal-only (J2), and that's a real ceiling, not just a
+  missing data file.** `input/GRAIL_lowdeg_zonal.dat` ships a single
+  degree-2 zonal row (normalized C̄₂₀ = −9.065019580784147×10⁻⁵, derived
+  from J2 = 202.7×10⁻⁶). The Moon's real gravity field is strongly
+  **mascon-dominated** (large localized C22 and higher-degree/order
+  terms, not just zonals) — and unlike a simple "supply a bigger
+  coefficient file" gap, `geo_coeff_body` (KSROP v2.3.0+) cannot actually
+  consume those terms even if a full GRGM-lineage file (e.g. GRGM900C)
+  were supplied: it explicitly filters non-zonal rows, and KSROP's whole
+  force-model pipeline has no tesseral (order m>0) force law at all.
+  Tracked upstream as
+  [KSROP#29](https://github.com/hari251086/KSROP/issues/29) — deliberately
+  scoped as a KSROP-level force-model extension (concrete motivating case:
+  a real, published Mars C₂₂/S₂₂ coefficient KSROP-Mars also can't
+  consume), not a fix local to this repo.
 - **No atmospheric drag** — the Moon is airless; this is by design, not a
   gap.
 - **SRP shadow radius correctly reuses the Moon's own radius** (the

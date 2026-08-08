@@ -101,9 +101,11 @@ project memory). A GMAT (or other independent tool) lunar cross-check is
 open follow-on work, not yet an issue.
 
 ## 9. Known Limitations
-- **J2-only lunar gravity field** — see README §8; the Moon's real field
-  is mascon-dominated (strong C22 and higher-degree/order terms), so this
-  is a deliberately coarse first cut, not production-fidelity.
+- **J2-only lunar gravity field, and it's a real ceiling** — see README
+  §8; the Moon's real field is mascon-dominated (strong C22 and
+  higher-degree/order terms) and KSROP's zonal-only force-model pipeline
+  cannot consume those terms regardless of what coefficient file is
+  supplied (KSROP#29).
 - **No independent (GMAT) cross-validation** — see §8.
 - **`EME2000`-labeled but Moon-centered frame** — axes parallel to
   Earth-equatorial J2000, translated (not rotated) to the Moon's center;
